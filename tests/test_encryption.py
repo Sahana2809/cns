@@ -186,3 +186,4 @@ if __name__ == "__main__":
     print(f"\nResult: {passed}/{len(tests)} tests passed.")
     if passed != len(tests):
         sys.exit(1)
+
