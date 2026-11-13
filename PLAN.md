@@ -1,176 +1,140 @@
-# SHADOW Wi-Fi — Project Implementation Plan
+# SHADOW Wi-Fi — My Part: Secure Session, Database, Dashboard & Alerts
 
-**Rogue Access Point Detection & Secure Wi-Fi Authentication Analyzer**
-Course: Cryptography and Network Security (26ECSC403) | Course Guide: Prof. Roopa Badami
-Team: Sahana V Agadi (116), Srushti B Bammanawadi (121), Sanmati U Shinganmakki (141)
-
----
-
-## 1. Scope recap
-
-A software-based system that (a) scans nearby Wi-Fi APs and flags suspicious ones using
-observable data (SSID/BSSID/security type), and (b) cryptographically verifies AP identity
-against a pre-registered trusted profile before trusting it. **Duplicate SSID is a warning
-sign, not proof of a rogue AP** — cryptographic verification is the real trust boundary.
-
-Dev environment: team is on **mixed OS** (Windows + Linux laptops), so the scanner must
-detect the OS and branch between `netsh wlan` (Windows) and `nmcli` (Linux).
-
----
-
-## 2. Three-way split
-
-### Part 1 — AP Discovery & Rogue Detection Engine
-**Owner: Sahana V Agadi**
-**Files:** `scanner.py`, `detector.py`, `tests/test_scanner.py`, `tests/test_detector.py`
-
-- Detect host OS; call `netsh wlan show networks mode=bssid` (Windows) or
-  `nmcli -f SSID,BSSID,CHAN,SIGNAL,SECURITY device wifi list` (Linux); parse both into one
-  common record:
-  ```python
-  {"ssid": str, "bssid": str, "channel": int, "signal": int, "security": str, "ts": datetime}
-  ```
-- Design the trusted-AP profile schema: `ssid`, `allowed_bssids[]`, `expected_security`,
-  `pubkey_fingerprint`, `owner/description`.
-- Implement `analyze_ap(ap, trusted_profiles)` →
-  `CANDIDATE_TRUSTED | SUSPICIOUS | SECURITY_MISMATCH | UNKNOWN`.
-- Write the comparison rules table (duplicate SSID + unknown BSSID, security downgrade, etc.)
-  exactly as in the spec.
-- Produce a clean list of `CANDIDATE_TRUSTED` APs as the handoff contract to Part 2.
-- Own **Test 2** (same SSID, unknown BSSID → suspicious warning).
-
-### Part 2 — Cryptographic Authentication & Key Exchange
-**Owner: Srushti B Bammanawadi**
-**Files:** `authentication.py`, `crypto/key_generation.py`, `crypto/digital_signature.py`,
-`crypto/key_exchange.py`, `simulated_ap/ap_server.py`, `tests/test_authentication.py`
-
-- Generate an Ed25519 signing keypair per simulated trusted AP; register the public key in
-  the Part 1 trusted-profile DB; keep the private key inside `simulated_ap/ap_server.py` only.
-- Challenge-response flow: analyzer issues a fresh random nonce → simulated AP signs
-  `(nonce, session info)` with its private key → analyzer verifies against the
-  **previously registered** public key (never trust a key the AP just hands over on the spot).
-- X25519 Diffie–Hellman key exchange + HKDF-SHA256 to derive the session key; authenticate
-  the exchange transcript with the Ed25519 signing key.
-- Reject reused nonces (replay protection) — track consumed nonces in-memory or in SQLite.
-- Own **Test 1** (valid signature → success), **Test 3** (invalid signature → rejected), and
-  the replay test.
-
-### Part 3 — Secure Session, Database, Dashboard & Alerts
 **Owner: Sanmati U Shinganmakki**
+Course: Cryptography and Network Security (26ECSC403)
+
+Full project context: see `PLAN.md` on `main` for the complete 3-way split and demo
+strategy. This file is your focused, detailed plan for **Part 3 only**.
+
+---
+
+## 1. What you own
+
 **Files:** `secure_session.py` (AES-GCM half), `database.py`, `app.py` (Streamlit),
-`tests/test_encryption.py`, integration entry point
+`tests/test_encryption.py`, `main.py` (integration entry point)
 
-- AES-GCM encrypt/decrypt with a unique nonce per message; demonstrate a tampered-ciphertext
-  message failing the GCM authentication tag.
-- SQLite schema: `trusted_profiles`, `discovered_aps`, `suspicious_events`, `auth_results`,
-  `security_logs`.
-- Streamlit dashboard: 4 metric tiles (APs discovered / suspicious / candidate-trusted /
-  auth failures) + 5 sections (nearby networks, trusted profiles, suspicious alerts, auth
-  results, security logs).
-- Wire the pipeline end-to-end: Part 1 scan → Part 1 classify → Part 2 crypto-verify →
-  Part 3 session + dashboard + logging. This person owns `main.py`/the integration glue.
-- Own **Test 4** (valid encrypted message decrypts) and **Test 5** (modified ciphertext →
-  integrity failure), plus final demo assembly.
-
-**Handoff contracts between parts** (fix these early so work can proceed in parallel):
-- Part 1 → Part 2: list of `CANDIDATE_TRUSTED` AP dicts with `ssid`/`bssid`.
-- Part 2 → Part 3: `{"ap": ..., "auth_result": "SUCCESS"|"FAILED", "session_key": bytes|None}`.
-- Everyone → Part 3's `database.py`: every module writes its events through the shared DB
-  functions, not directly to SQLite.
+You close the loop: take Srushti's verified session key, actually encrypt/decrypt
+traffic with it, persist everything to SQLite, and surface it all on a live dashboard.
+You also own wiring Part 1 → Part 2 → Part 3 together in `main.py`.
 
 ---
 
-## 3. Tech stack
+## 2. Input you receive from Part 2 (Srushti)
 
-| Component | Technology |
-|---|---|
-| Language | Python |
-| Dashboard | Streamlit |
-| Wi-Fi scanning | `netsh` (Windows) / `nmcli` (Linux), OS-detected |
-| Cryptography | `cryptography` (Ed25519, X25519, HKDF, AES-GCM) |
-| Database | SQLite |
-| Data handling | Pandas |
-| Testing | Pytest |
-
-```
-pip install streamlit cryptography pandas pytest
+```python
+{
+    "ap": {"ssid": ..., "bssid": ...},
+    "auth_result": "SUCCESS" | "FAILED",
+    "reason": str,
+    "session_key": bytes | None,
+}
 ```
 
 ---
 
-## 4. Demonstration strategy — real devices vs. simulation
+## 3. `secure_session.py` — AES-GCM secure messaging
 
-Goal: demonstrate on laptops/phones wherever the behavior is genuinely observable over
-real Wi-Fi, and simulate only the piece the spec says ordinary scanning *cannot* provide
-(cryptographic AP identity).
+Only runs when `auth_result == "SUCCESS"` and you have a `session_key`.
 
-| Demo | Real hardware or simulated? | How |
-|---|---|---|
-| Scenario 1 — legitimate AP detected | **Real** | Scan an actual home/college Wi-Fi, register it as a trusted profile with its real BSSID. |
-| Scenario 2 — duplicate SSID | **Real** | Turn two phones into hotspots with the *same SSID* (one matches the registered BSSID, one doesn't) — both show up in a real scan, Part 1 flags the unregistered BSSID as `SUSPICIOUS`. |
-| Security mismatch | **Real** | Set one hotspot to WPA2 and a same-SSID hotspot to Open — real scan shows `SECURITY_MISMATCH`. |
-| Scenario 3 — cryptographic auth failure | **Simulated** | Real consumer hotspots (phone/laptop) don't support a custom challenge-response protocol. Run `simulated_ap/ap_server.py` locally (can be on a laptop reachable over the same real Wi-Fi/LAN, or just localhost) acting as the "AP's authentication service." Demo both a correctly-signed response (success) and a deliberately wrong/missing key (rejected). |
-| Scenario 4 — secure session + tamper detection | **Simulated** (crypto layer) over a **real network link** | Run the Diffie–Hellman handshake and AES-GCM messaging between two real laptops/phones on the same LAN/hotspot, so the *transport* is real even though the "AP identity service" is a simulated Python process. |
+1. Encrypt a test message with **AES-GCM**, generating a **unique nonce per message**
+   (never reuse a nonce with the same key).
+2. "Send" the ciphertext + nonce + auth tag to a receiving side (can be the same process
+   for the demo, or genuinely two laptops/phones over the same LAN for a stronger demo).
+3. Decrypt at the receiving end, verify the auth tag.
+4. Reject any message whose auth tag doesn't verify (this is your tamper-detection demo —
+   AES-GCM already gives you authenticated encryption, no separate HMAC pass needed for
+   this integrity check).
 
-This matches the spec's explicit boundary: real scanning proves AP *presence and observable
-config*; the simulated AP authentication service proves *cryptographic identity* — don't
-blur the two in the report or presentation.
-
----
-
-## 5. Development schedule
-
-| Phase | Work | Primary owner |
-|---|---|---|
-| 1 | Env setup, repo/folder structure, shared data contracts | All |
-| 2 | Wi-Fi scanning (cross-OS) | Sahana |
-| 3 | Trusted AP DB + detection engine | Sahana |
-| 4 | Challenge-response + Ed25519 signatures + simulated AP service | Srushti |
-| 5 | X25519 Diffie–Hellman + HKDF session key | Srushti |
-| 6 | AES-GCM secure session + SQLite schema | Sanmati |
-| 7 | Dashboard + alerts + integration of all 3 parts | Sanmati (+ all for integration) |
-| 8 | Run the 5 test scenarios on real devices, fix issues, prepare demo + report | All |
-
----
-
-## 6. Recommended folder structure
-
+Example to reproduce for the demo/report:
 ```
-SHADOW-WIFI/
-├── app.py                     (Sanmati)
-├── scanner.py                 (Sahana)
-├── detector.py                (Sahana)
-├── authentication.py          (Srushti)
-├── secure_session.py          (Srushti: key exchange / Sanmati: AES-GCM)
-├── database.py                (Sanmati)
-├── main.py                    (Sanmati — integration)
-│
-├── crypto/
-│   ├── key_generation.py      (Srushti)
-│   ├── digital_signature.py   (Srushti)
-│   └── key_exchange.py        (Srushti)
-│
-├── simulated_ap/
-│   └── ap_server.py           (Srushti)
-│
-├── tests/
-│   ├── test_scanner.py        (Sahana)
-│   ├── test_detector.py       (Sahana)
-│   ├── test_authentication.py (Srushti)
-│   └── test_encryption.py     (Sanmati)
-│
-├── data/
-│   └── shadow_wifi.db
-│
-├── PLAN.md
-└── requirements.txt
+Original message:   "Confidential data"
+Encrypted message:   <unreadable ciphertext>
+Decrypted message:  "Confidential data"
+Modified ciphertext: AUTHENTICATION FAILURE
 ```
 
+Checklist:
+- [ ] `encrypt(session_key, plaintext) -> (nonce, ciphertext)`
+- [ ] `decrypt(session_key, nonce, ciphertext) -> plaintext` (raises/returns `None` on
+      bad tag)
+- [ ] Nonce-reuse guard (track used nonces per session key, same pattern as Srushti's
+      nonce tracking on the auth side — keep the two independent, different purposes)
+
 ---
 
-## 7. Evaluation criteria to keep in mind
+## 4. `database.py` — SQLite schema
 
-Detection accuracy on controlled test cases, authentication success/failure correctness,
-encryption/decryption verification, message-tampering detection, and communication
-overhead. Keep the report/demo framing consistent: SSID-based signals are *indicators*,
-cryptographic verification is *proof*.
+Tables:
+- `trusted_profiles` — ssid, allowed_bssids, security, pubkey_fingerprint, owner
+  (written by Part 1, read by Part 2)
+- `discovered_aps` — every scan result from Part 1, with timestamp
+- `suspicious_events` — APs flagged `SUSPICIOUS`/`SECURITY_MISMATCH` by Part 1
+- `auth_results` — every Part 2 challenge-response outcome, with reason string
+- `security_logs` — a unified timeline of everything above, for the dashboard's log view
+
+Every other module should write through functions you expose here
+(`save_scan_result()`, `save_auth_result()`, `log_event()`, etc.) — don't let Sahana or
+Srushti write raw SQL from their own files; keep the schema in one place (yours).
+
+---
+
+## 5. `app.py` — Streamlit dashboard
+
+4 metric tiles at the top:
+- APs discovered
+- Suspicious APs
+- Candidate trusted APs
+- Authentication failures
+
+5 sections below:
+- Nearby Wi-Fi networks (live scan table: SSID, security, status)
+- Trusted AP profiles
+- Suspicious AP alerts
+- Authentication results
+- Security event logs
+
+All of this reads from `database.py` — the dashboard itself should contain no business
+logic, just queries + display.
+
+---
+
+## 6. `main.py` — integration glue
+
+```
+aps = scanner.scan()                                  # Part 1
+analyzed = detector.analyze_all(aps, trusted_profiles) # Part 1
+candidates = [a for a in analyzed if a["status"] == "CANDIDATE_TRUSTED"]
+auth_results = [authentication.verify(ap) for ap in candidates]  # Part 2
+for result in auth_results:
+    if result["auth_result"] == "SUCCESS":
+        secure_session.demo_message(result["session_key"])        # Part 3
+database.log_everything(analyzed, auth_results)                   # Part 3
+```
+You are responsible for making sure this pipeline actually runs without the three parts'
+interfaces drifting apart — if Sahana or Srushti change a field name, update this file
+and flag it to them.
+
+---
+
+## 7. Your test scenarios
+
+- **Test 4** — valid encrypted message decrypts correctly.
+- **Test 5** — modified ciphertext → integrity verification fails.
+
+Run these over a real LAN/hotspot link between two laptops/phones if possible (stronger
+demo), or same-process if time is short — either is acceptable since the crypto logic
+itself is what's being graded, not the transport.
+
+---
+
+## 8. Build order
+
+1. SQLite schema + `database.py` CRUD functions first — Sahana and Srushti will want to
+   write through these as soon as their modules exist.
+2. AES-GCM encrypt/decrypt round-trip in isolation (hardcoded key, no session yet).
+3. Plug in Srushti's real `session_key` once Part 2 is ready.
+4. Build `app.py` against whatever's in the DB so far (even partial data) — iterate the
+   dashboard incrementally rather than waiting for everything to be finished.
+5. Write `main.py` to stitch all three parts together; this is also your integration
+   test — if it runs end-to-end, the project works.
+6. `tests/test_encryption.py` for Test 4 and Test 5.
