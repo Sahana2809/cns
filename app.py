@@ -192,7 +192,9 @@ with tab1:
                 return "background-color: #fff3cd; color: #856404; font-weight: bold;"
             return "background-color: #e2e3e5; color: #383d41;"
 
-        styled_scans = df_scans.style.applymap(color_status, subset=["status"])
+        # Use .map() for Pandas >= 2.1, with fallback to .applymap() for older versions
+        styler_method = getattr(df_scans.style, "map", getattr(df_scans.style, "applymap", None))
+        styled_scans = styler_method(color_status, subset=["status"]) if styler_method else df_scans
         st.dataframe(
             styled_scans,
             use_container_width=True,
@@ -318,7 +320,8 @@ with tab4:
                 return "background-color: #d4edda; color: #155724; font-weight: bold;"
             return "background-color: #f8d7da; color: #721c24; font-weight: bold;"
 
-        styled_auth = df_auth.style.applymap(style_auth, subset=["auth_result"])
+        auth_styler_method = getattr(df_auth.style, "map", getattr(df_auth.style, "applymap", None))
+        styled_auth = auth_styler_method(style_auth, subset=["auth_result"]) if auth_styler_method else df_auth
         st.dataframe(
             styled_auth,
             use_container_width=True,
