@@ -113,7 +113,11 @@ def init_db(db_path: Optional[str | Path] = None, seed_defaults: bool = True) ->
                         "College_WiFi",
                         json.dumps(["AA:BB:CC:11:22:33", "AA:BB:CC:11:22:34"]),
                         "WPA2",
-                        "a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0",
+                        # Left unassigned until crypto/key_generation.py registers the
+                        # real fingerprint of the simulated AP's Ed25519 keypair - a
+                        # placeholder value here would be indistinguishable from a
+                        # genuinely pinned key but would never actually match one.
+                        None,
                         "Campus IT Admin",
                         now,
                     ),
