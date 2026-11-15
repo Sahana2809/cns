@@ -11,9 +11,7 @@ Part 3 (Sanmati): Establishes AES-GCM encrypted session, logs results, and
 
 import argparse
 import hashlib
-import json
 import os
-import sys
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 

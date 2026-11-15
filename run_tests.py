@@ -1,20 +1,21 @@
 """Unified Test Runner for SHADOW Wi-Fi.
 
-Runs all test suites across the project:
-1. Part 1 Scanner tests (tests/test_scanner.py)
-2. Part 1 Detector tests (tests/test_detector.py)
-3. Part 3 AES-GCM Encryption & Tamper tests (tests/test_encryption.py)
+Discovers and runs every tests/test_*.py module in the project, so this
+stays correct as modules are added rather than needing a hand-maintained
+list (the previous hardcoded list only covered Part 1 and part of Part 3,
+silently skipping authentication/key-exchange/secure-session tests).
 
 Can be executed directly with:
     python run_tests.py
 """
 
 import sys
-import unittest
 from pathlib import Path
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+TESTS_DIR = Path(__file__).resolve().parent / "tests"
 
 
 def run_test_module(module_name: str) -> tuple[int, int]:
@@ -49,11 +50,10 @@ def main():
     print("  SHADOW Wi-Fi — Test Suite Execution")
     print("=" * 60)
 
-    modules = [
-        "tests.test_scanner",
-        "tests.test_detector",
-        "tests.test_encryption",
-    ]
+    modules = sorted(
+        f"tests.{path.stem}"
+        for path in TESTS_DIR.glob("test_*.py")
+    )
 
     total_passed = 0
     total_failed = 0

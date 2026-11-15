@@ -13,9 +13,7 @@ Displays real-time monitoring and security metrics:
 3. Interactive AES-GCM Secure Session & Tamper Detection Lab
 """
 
-import os
 import sys
-from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -86,7 +84,7 @@ database.init_db(seed_defaults=True)
 # -----------------------------------------------------------------------------
 # SIDEBAR CONTROLS
 # -----------------------------------------------------------------------------
-st.sidebar.image("https://img.icons8.com/color/96/000000/wifi-router.png", width=64)
+st.sidebar.markdown("<span style='font-size:48px;'>📡</span>", unsafe_allow_html=True)
 st.sidebar.title("SHADOW Wi-Fi")
 st.sidebar.caption("Rogue AP Detector & Secure Authenticator")
 st.sidebar.markdown("**Course:** CNS (26ECSC403) | **Year:** 2026–27")

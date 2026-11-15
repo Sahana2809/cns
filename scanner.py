@@ -195,7 +195,11 @@ def scan():
         output = _run_command(["netsh", "wlan", "show", "networks", "mode=bssid"])
         return parse_netsh_output(output)
     if system == "Linux":
-        output = _run_command(["nmcli", "-t", "-f", "SSID,BSSID,CHAN,SIGNAL,SECURITY", "device", "wifi", "list"])
+        # --rescan yes forces an active scan instead of returning nmcli's
+        # cached list, which can otherwise be stale by the time this runs.
+        output = _run_command(
+            ["nmcli", "-t", "-f", "SSID,BSSID,CHAN,SIGNAL,SECURITY", "device", "wifi", "list", "--rescan", "yes"]
+        )
         return parse_nmcli_output(output)
     if system == "Darwin":
         output = _run_command(["system_profiler", "SPAirPortDataType"])
