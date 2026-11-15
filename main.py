@@ -82,19 +82,22 @@ def authenticate_candidate_aps(
     candidates: List[Dict[str, Any]],
     trusted_profiles: Dict[str, Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
-    """Verify candidate APs using Part 2 authentication module (or fallback mock)."""
+    """Verify candidate APs using Part 2's real challenge-response + key-exchange
+    module (crypto/, simulated_ap/, authentication.py), falling back to a mock
+    verifier only if that module or its registered key material isn't available.
+    """
     results = []
     for ap in candidates:
-        if authentication and hasattr(authentication, "verify"):
+        if authentication and hasattr(authentication, "establish_secure_session"):
             try:
-                res = authentication.verify(ap)
+                res = authentication.establish_secure_session(ap)
             except Exception as e:
                 res = {
-                    "ap": {"ssid": ap.get("ssid"), "bssid": ap.get("bssid")},
                     "auth_result": "FAILED",
                     "reason": f"Authentication exception: {e}",
                     "session_key": None,
                 }
+            res.setdefault("ap", {"ssid": ap.get("ssid"), "bssid": ap.get("bssid")})
         else:
             res = mock_verify_ap(ap, trusted_profiles)
         results.append(res)
