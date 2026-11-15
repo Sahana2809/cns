@@ -1,5 +1,8 @@
 .venv/
+venv/
 __pycache__/
 *.pyc
 .pytest_cache/
 data/*.db
+data/*.pem
+simulated_ap/ap_private_key.pem

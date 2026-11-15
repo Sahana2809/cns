@@ -20,7 +20,7 @@ detect the OS and branch between `netsh wlan` (Windows) and `nmcli` (Linux).
 
 ## 2. Three-way split
 
-### Part 1 — AP Discovery & Rogue Detection Engine
+### Part 1 — AP Discovery & Rogue Detection Engine (done)
 **Owner: Sahana V Agadi**
 **Files:** `scanner.py`, `detector.py`, `tests/test_scanner.py`, `tests/test_detector.py`
 
@@ -39,7 +39,7 @@ detect the OS and branch between `netsh wlan` (Windows) and `nmcli` (Linux).
 - Produce a clean list of `CANDIDATE_TRUSTED` APs as the handoff contract to Part 2.
 - Own **Test 2** (same SSID, unknown BSSID → suspicious warning).
 
-### Part 2 — Cryptographic Authentication & Key Exchange
+### Part 2 — Cryptographic Authentication & Key Exchange (done)
 **Owner: Srushti B Bammanawadi**
 **Files:** `authentication.py`, `crypto/key_generation.py`, `crypto/digital_signature.py`,
 `crypto/key_exchange.py`, `simulated_ap/ap_server.py`, `tests/test_authentication.py`
@@ -55,7 +55,7 @@ detect the OS and branch between `netsh wlan` (Windows) and `nmcli` (Linux).
 - Own **Test 1** (valid signature → success), **Test 3** (invalid signature → rejected), and
   the replay test.
 
-### Part 3 — Secure Session, Database, Dashboard & Alerts
+### Part 3 — Secure Session, Database, Dashboard & Alerts (done)
 **Owner: Sanmati U Shinganmakki**
 **Files:** `secure_session.py` (AES-GCM half), `database.py`, `app.py` (Streamlit),
 `tests/test_encryption.py`, integration entry point
