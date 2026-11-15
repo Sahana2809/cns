@@ -29,13 +29,16 @@ python main.py --init-db
 
 What just happened (say this if asked):
 - Created an isolated Python environment and installed the project's dependencies.
-- `key_generation.py` generated a fresh **Ed25519 keypair** for the simulated trusted AP
-  (private key never leaves this machine, public key goes in the trusted profile DB).
-- `--init-db` created the SQLite database and seeded one trusted AP profile
-  (`College_WiFi`).
+- `key_generation.py` generated a fresh **Ed25519 keypair** for the simulated trusted AP,
+  and registered its SHA-256 fingerprint against the `College_WiFi` trusted profile in
+  the database — this fingerprint is what authentication.py pins against later, not just
+  "does some signature verify."
+- `--init-db` created the SQLite database and seeded that trusted AP profile.
 
 Do this setup once, before the demo starts, so you're not waiting on `pip install`
-live in front of her.
+live in front of her. `key_generation.py` is safe to re-run any time — it won't
+overwrite an existing key pair, and it re-syncs the database fingerprint to whatever
+key is currently on disk either way.
 
 ---
 
@@ -74,7 +77,10 @@ Auth Result: SUCCESS for College_WiFi [...]: Authenticated secure session establ
 **Say:** "Only the one AP that passed the observable checks goes on to cryptographic
 verification — Ed25519 challenge-response, then an X25519 Diffie-Hellman key
 exchange with HKDF to derive a session key. This is the *real* trust boundary, not
-the SSID."
+the SSID. It's also not just 'does this signature verify' — the public key loaded
+from disk has to match the exact fingerprint registered for this SSID in the
+database. A valid signature from the wrong key gets rejected too, which is closer to
+how certificate pinning works in real systems."
 
 Then the AES-GCM block at the bottom:
 ```
@@ -114,13 +120,18 @@ without the rest of the pipeline in the way."
 streamlit run app.py
 ```
 
-This opens a browser tab automatically (usually `http://localhost:8501`). Walk
-through the tabs in this order:
+This opens a browser tab automatically (usually `http://localhost:8501`) — a dark
+"security operations center" style dashboard with a gradient header banner and
+card-styled KPI tiles at the top (APs discovered, suspicious rogue APs, candidate
+trusted APs, auth failures). Walk through the tabs in this order:
 
 1. **Nearby Networks** — the live table of every discovered AP with its Trust Status
-   column color-coded.
-2. **Trusted AP Profiles** — the registered profile(s) the system checks against.
-3. **Suspicious Alerts** — just the flagged ones, isolated.
+   column color-coded (green = candidate trusted, red = suspicious, amber = security
+   mismatch, grey = unknown).
+2. **Trusted AP Profiles** — the registered profile(s) the system checks against,
+   including the Ed25519 fingerprint `key_generation.py` registered.
+3. **Suspicious Alerts** — just the flagged ones, as individual alert cards (this is
+   the clearest "SOC dashboard" moment visually — point it out).
 4. **Cryptographic Auth** — real verification log: SSID, BSSID, result, and the
    SHA-256 fingerprint of the session key established.
 5. **AES-GCM Crypto Lab** — the interactive part. Type any message, tick "Simulate
@@ -161,3 +172,8 @@ intentional, not a shortcut you need to apologize for.
   and open that port instead.
 - **`FileNotFoundError: ap_private_key.pem`** → you skipped the one-time setup step;
   run `python crypto/key_generation.py` once.
+- **Auth result says "Public key fingerprint mismatch"** → the database has a
+  fingerprint registered that doesn't match the key currently on disk (e.g. you
+  deleted/regenerated keys without re-syncing, or copied `data/shadow_wifi.db` from
+  another machine without its matching keys). Re-run `python crypto/key_generation.py`
+  — it always re-syncs the database to whatever key is currently on disk.

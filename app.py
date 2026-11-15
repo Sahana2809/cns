@@ -36,43 +36,73 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Custom CSS for styling
+# Custom CSS: dark "security operations center" theme layered on top of the
+# base theme set in .streamlit/config.toml. Keep selectors generic enough
+# to survive minor Streamlit version differences.
 st.markdown(
     """
     <style>
-    .metric-card {
-        background-color: #f8f9fa;
-        border-radius: 8px;
-        padding: 14px 18px;
-        border-left: 4px solid #1f77b4;
+    .block-container { padding-top: 2rem; max-width: 1200px; }
+
+    /* Hero banner */
+    .swf-hero {
+        display: flex;
+        align-items: center;
+        gap: 22px;
+        background: linear-gradient(135deg, #0f172a 0%, #132743 55%, #0891b2 130%);
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        border-radius: 16px;
+        padding: 28px 34px;
+        margin-bottom: 26px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.25);
     }
-    .badge-trusted {
-        color: #155724;
-        background-color: #d4edda;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-weight: 600;
+    .swf-hero-icon { font-size: 46px; line-height: 1; filter: drop-shadow(0 0 10px rgba(34,211,238,0.5)); }
+    .swf-hero-title {
+        font-size: 1.9rem; font-weight: 800; color: #f8fafc;
+        letter-spacing: -0.02em; margin: 0;
     }
-    .badge-suspicious {
-        color: #721c24;
-        background-color: #f8d7da;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-weight: 600;
+    .swf-hero-subtitle { color: #94a3b8; font-size: 0.95rem; margin-top: 4px; max-width: 640px; }
+    .swf-chip-row { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .swf-chip {
+        background: rgba(148, 163, 184, 0.12);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        color: #cbd5e1;
+        padding: 4px 13px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 500;
     }
-    .badge-mismatch {
-        color: #856404;
-        background-color: #fff3cd;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-weight: 600;
+
+    /* Metric cards */
+    div[data-testid="stMetric"] {
+        background-color: #111a2e;
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        border-radius: 12px;
+        padding: 16px 20px 12px;
+        transition: border-color 0.15s ease, transform 0.15s ease;
     }
-    .badge-unknown {
-        color: #383d41;
-        background-color: #e2e3e5;
-        padding: 4px 8px;
-        border-radius: 4px;
+    div[data-testid="stMetric"]:hover {
+        border-color: rgba(34, 211, 238, 0.45);
+        transform: translateY(-2px);
     }
+    div[data-testid="stMetricLabel"] { font-size: 0.82rem; color: #94a3b8; letter-spacing: 0.01em; }
+    div[data-testid="stMetricValue"] { font-size: 1.9rem; font-weight: 700; }
+
+    /* Status pill badges (used in alert cards) */
+    .swf-badge {
+        display: inline-block;
+        padding: 3px 11px;
+        border-radius: 999px;
+        font-weight: 700;
+        font-size: 0.72rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+    }
+    .swf-badge-danger { background: #7f1d1d; color: #fca5a5; }
+    .swf-badge-warning { background: #78350f; color: #fcd34d; }
+    .swf-badge-success { background: #065f46; color: #6ee7b7; }
+
+    section[data-testid="stSidebar"] { border-right: 1px solid rgba(148, 163, 184, 0.12); }
     </style>
     """,
     unsafe_allow_html=True,
@@ -84,13 +114,13 @@ database.init_db(seed_defaults=True)
 # -----------------------------------------------------------------------------
 # SIDEBAR CONTROLS
 # -----------------------------------------------------------------------------
-st.sidebar.markdown("<span style='font-size:48px;'>📡</span>", unsafe_allow_html=True)
+st.sidebar.markdown("<div style='font-size:40px;'>🛡️📡</div>", unsafe_allow_html=True)
 st.sidebar.title("SHADOW Wi-Fi")
 st.sidebar.caption("Rogue AP Detector & Secure Authenticator")
-st.sidebar.markdown("**Course:** CNS (26ECSC403) | **Year:** 2026–27")
-st.sidebar.markdown("**Team:** Sahana (116), Srushti (121), Sanmati (141)")
+st.sidebar.markdown("**Course:** CNS (26ECSC403)  \n**Year:** 2026–27")
+st.sidebar.markdown("**Team:** Sahana (116) · Srushti (121) · Sanmati (141)")
 
-st.sidebar.markdown("---")
+st.sidebar.divider()
 st.sidebar.subheader("⚡ Actions & Pipeline")
 
 if st.sidebar.button("📡 Run Live Wi-Fi Scan", use_container_width=True, help="Scan local network via netsh/nmcli"):
@@ -108,7 +138,7 @@ if st.sidebar.button("🧪 Run Simulated Demo Suite", use_container_width=True, 
 if st.sidebar.button("🔄 Refresh Data", use_container_width=True):
     st.rerun()
 
-st.sidebar.markdown("---")
+st.sidebar.divider()
 with st.sidebar.expander("⚙️ Database Operations"):
     if st.button("Re-seed Default Profiles", use_container_width=True):
         database.init_db(seed_defaults=True)
@@ -116,12 +146,28 @@ with st.sidebar.expander("⚙️ Database Operations"):
         st.rerun()
 
 # -----------------------------------------------------------------------------
-# MAIN HEADER & METRIC TILES
+# HERO HEADER
 # -----------------------------------------------------------------------------
-st.title("🛡️ SHADOW Wi-Fi Security Dashboard")
 st.markdown(
-    "Automated Wi-Fi Access Point discovery, rogue duplicate-SSID detection, "
-    "and post-authentication **AES-256-GCM** secure session messaging."
+    """
+    <div class="swf-hero">
+        <div class="swf-hero-icon">🛡️</div>
+        <div>
+            <p class="swf-hero-title">SHADOW Wi-Fi Security Dashboard</p>
+            <div class="swf-hero-subtitle">
+                Automated access point discovery, rogue duplicate-SSID detection, cryptographic
+                identity verification, and post-authentication AES-256-GCM secure messaging.
+            </div>
+            <div class="swf-chip-row">
+                <span class="swf-chip">CNS · 26ECSC403</span>
+                <span class="swf-chip">Ed25519 + X25519 + HKDF</span>
+                <span class="swf-chip">AES-256-GCM</span>
+                <span class="swf-chip">SQLite-backed</span>
+            </div>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
 
 # Top 4 Metric Tiles
@@ -130,13 +176,13 @@ col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     st.metric(
-        label="📡 APs Discovered",
+        label="📡 APS DISCOVERED",
         value=metrics["total_discovered"],
         help="Total access point scans recorded",
     )
 with col2:
     st.metric(
-        label="🚨 Suspicious Rogue APs",
+        label="🚨 SUSPICIOUS ROGUE APS",
         value=metrics["suspicious_aps"],
         delta=f"{metrics['suspicious_aps']} alerts",
         delta_color="inverse",
@@ -144,20 +190,20 @@ with col2:
     )
 with col3:
     st.metric(
-        label="🔒 Candidate Trusted APs",
+        label="🔒 CANDIDATE TRUSTED APS",
         value=metrics["candidate_trusted"],
         help="APs matching registered profiles ready for crypto authentication",
     )
 with col4:
     st.metric(
-        label="❌ Auth Failures",
+        label="❌ AUTH FAILURES",
         value=metrics["auth_failures"],
         delta=f"{metrics['auth_failures']} rejected" if metrics["auth_failures"] > 0 else "0",
         delta_color="inverse",
         help="Cryptographic challenge-response or signature verification failures",
     )
 
-st.markdown("---")
+st.write("")
 
 # -----------------------------------------------------------------------------
 # 5 CORE SECTIONS (TABS)
@@ -183,12 +229,12 @@ with tab1:
         # Color coding helper
         def color_status(val):
             if val == "CANDIDATE_TRUSTED":
-                return "background-color: #d4edda; color: #155724; font-weight: bold;"
+                return "background-color: #065f46; color: #6ee7b7; font-weight: 700;"
             elif val == "SUSPICIOUS":
-                return "background-color: #f8d7da; color: #721c24; font-weight: bold;"
+                return "background-color: #7f1d1d; color: #fca5a5; font-weight: 700;"
             elif val == "SECURITY_MISMATCH":
-                return "background-color: #fff3cd; color: #856404; font-weight: bold;"
-            return "background-color: #e2e3e5; color: #383d41;"
+                return "background-color: #78350f; color: #fcd34d; font-weight: 700;"
+            return "background-color: #1e293b; color: #94a3b8;"
 
         # Use .map() for Pandas >= 2.1, with fallback to .applymap() for older versions
         styler_method = getattr(df_scans.style, "map", getattr(df_scans.style, "applymap", None))
@@ -281,21 +327,22 @@ with tab3:
         for alert in alerts:
             event_type = alert.get("event_type")
             is_rogue = (event_type == "SUSPICIOUS_BSSID")
-            alert_color = "#f8d7da" if is_rogue else "#fff3cd"
-            border_color = "#dc3545" if is_rogue else "#ffc107"
+            border_color = "#ef4444" if is_rogue else "#f59e0b"
+            badge_class = "swf-badge-danger" if is_rogue else "swf-badge-warning"
+            label = "Rogue AP — Duplicate SSID" if is_rogue else "Security Configuration Mismatch"
 
             st.markdown(
                 f"""
-                <div style="background-color: {alert_color}; border-left: 6px solid {border_color}; padding: 12px; margin-bottom: 12px; border-radius: 6px;">
-                    <div style="font-size: 15px; font-weight: 700; color: #333;">
-                        {'⚠️ ROGUE AP WARNING: DUPLICATE SSID' if is_rogue else '⚡ SECURITY CONFIGURATION MISMATCH'}
+                <div style="background-color: #111a2e; border: 1px solid rgba(148,163,184,0.12);
+                            border-left: 4px solid {border_color}; padding: 14px 18px;
+                            margin-bottom: 12px; border-radius: 10px;">
+                    <span class="swf-badge {badge_class}">{'⚠ ' if is_rogue else '⚡ '}{label}</span>
+                    <div style="margin: 10px 0 4px; color: #94a3b8; font-size: 13px;">
+                        <strong style="color:#e2e8f0;">SSID</strong> {alert.get('ssid')} &nbsp;·&nbsp;
+                        <strong style="color:#e2e8f0;">BSSID</strong> {alert.get('bssid')} &nbsp;·&nbsp;
+                        <strong style="color:#e2e8f0;">Time</strong> {alert.get('timestamp')}
                     </div>
-                    <div style="margin: 4px 0; color: #444;">
-                        <strong>SSID:</strong> <code>{alert.get('ssid')}</code> &nbsp;|&nbsp; 
-                        <strong>BSSID:</strong> <code>{alert.get('bssid')}</code> &nbsp;|&nbsp; 
-                        <strong>Timestamp:</strong> {alert.get('timestamp')}
-                    </div>
-                    <div style="color: #222;">{alert.get('description')}</div>
+                    <div style="color: #cbd5e1; font-size: 13.5px;">{alert.get('description')}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
@@ -315,8 +362,8 @@ with tab4:
 
         def style_auth(val):
             if val == "SUCCESS":
-                return "background-color: #d4edda; color: #155724; font-weight: bold;"
-            return "background-color: #f8d7da; color: #721c24; font-weight: bold;"
+                return "background-color: #065f46; color: #6ee7b7; font-weight: 700;"
+            return "background-color: #7f1d1d; color: #fca5a5; font-weight: 700;"
 
         auth_styler_method = getattr(df_auth.style, "map", getattr(df_auth.style, "applymap", None))
         styled_auth = auth_styler_method(style_auth, subset=["auth_result"]) if auth_styler_method else df_auth
